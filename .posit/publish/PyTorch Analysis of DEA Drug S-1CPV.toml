@@ -1,0 +1,15 @@
+product_type = 'connect_cloud'
+'$schema' = 'https://cdn.posit.co/publisher/schemas/posit-publishing-schema-v3.json'
+type = 'html'
+entrypoint = 'summary.html'
+source = 'summary.qmd'
+validate = true
+files = [
+  '/summary.html',
+  '/summary_files',
+  '/.posit/publish/PyTorch Analysis of DEA Drug S-1CPV.toml',
+  '/.posit/publish/deployments/deployment-TK4Q.toml',
+  '/summary.qmd',
+  '/artifacts'
+]
+title = 'PyTorch Analysis of DEA Drug Seizures: Reexamining the Border Dilution Effect from 2010 to 2022'

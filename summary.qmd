@@ -1,0 +1,255 @@
+---
+title: "PyTorch Analysis of DEA Drug Seizures: Reexamining the Border Dilution Effect from 2010 to 2022"
+author: "Rodrigo Silva Ferreira"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    theme: cosmo
+    code-fold: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+## 1. Introduction
+
+In 2010, a widely cited study suggested that drug purity systematically declines as distance from the U.S.–Mexico border increases.  
+This so-called **“border dilution effect”** has informed public narratives and law enforcement strategies, often justifying border militarization and surveillance.  
+
+However, the empirical basis of this effect has rarely been revisited in the years since.  
+This project uses **DEA LIMS (Laboratory Information Management System)** data from 2010–2022 to assess whether this gradient persists in contemporary drug markets.
+
+The goal is to **test the validity of the border dilution hypothesis** using:
+- modern machine learning (PyTorch),
+- spatial and temporal exploratory analysis,
+- and permutation-based feature importance.
+
+---
+
+## 2. Data & Methods
+
+### 2.1 Dataset Overview
+
+- **Source**: DEA LIMS Public Use File  
+- **Coverage**: 2010–2022 (50 states + D.C., with ND/SD/NE/WY aggregated)  
+- **Variables**:  
+  - `Year`, `Month`  
+  - `State`  
+  - `Drug Type` (Fentanyl, Methamphetamine, Cocaine, Heroin, Cannabis, Other)  
+  - `Purity` (reported in 10% bins, converted to midpoint values)  
+  - `Net Weight` (binned)  
+  - `Price` (binned)
+
+- **Geographic tiers** were defined by proximity to the U.S.–Mexico border, but many records lacked explicit tier mapping.
+
+### 2.2 Preprocessing
+
+- Purity values converted to **numeric midpoints**  
+  - Example: `0–10%` → `5.0`  
+- Whitespace and formatting cleaned across all fields  
+- States normalized (aggregating low-volume states)  
+- Missing purity values left as NaN  
+- Tier assignment attempted but incomplete
+
+### 2.3 Modeling
+
+- A **feed-forward neural network** (FFNN) in PyTorch was trained to classify purity category based on features (`state`, `drug type`, `net weight`, etc.).
+- **Leave-One-Year-Out (LOYO)** validation:
+  - Train on all years except one
+  - Test on the excluded year
+  - Repeat for each year from 2010–2022
+- Metrics:
+  - Accuracy
+  - Macro F1
+
+### 2.4 Feature Importance
+
+- Permutation importance was computed post-hoc to quantify contribution of each feature to predictive performance.
+
+---
+
+## 3. Results
+
+### 3.1 Temporal Model Performance (LOYO)
+
+The model demonstrates **relatively stable accuracy over time** between 2010 and 2022, with accuracy consistently in the 0.6–0.7 range.  
+This stability suggests that the **relationship between observed features (e.g., drug type, state) and purity** remains fairly constant across years.  
+Although Macro F1 is lower than accuracy, it remains steady as well, indicating class imbalance but not temporal drift.
+
+![](../artifacts/performance_over_time.png){fig-cap="Temporal model performance across years using Leave-One-Year-Out validation." width=80%}
+
+---
+
+### 3.2 Feature Contribution
+
+Permutation importance reveals that **drug type is by far the most predictive feature**, with Fentanyl, Methamphetamine, and Cocaine dominating.  
+Geographic features (e.g., state) contribute minimally, which already hints that **purity is less tied to location** and more to the substance itself.
+
+![](../artifacts/permutation_importance_top15.png){fig-cap="Top 15 features ranked by permutation importance." width=80%}
+
+---
+
+### 3.3 Ablation Study
+
+To test the **effect of removing geographic information**, ablation experiments compared:
+- **Baseline** (State + Geo)
+- **No Geo** (state only)
+- **No State** (geo only)
+
+Performance **did not degrade substantially** when geography was removed.  
+This supports the earlier finding that **geography contributes little** to the model’s predictive power compared to drug type.
+
+![](../artifacts/ablation_comparison.png){fig-cap="Effect of removing key features on model performance (ablation analysis)." width=80%}
+
+---
+
+### 3.4 Geographic Distribution of Purity
+
+Mapping average purity by state shows **high purity across the entire country**, with only slight variation.  
+Interior states exhibit purity levels similar to or higher than border states, providing **no visual evidence of a clear geographic gradient**.
+
+![](../artifacts/heatmap_purity_by_state.png){fig-cap="Average drug purity by state, 2010–2022 (heatmap visualization)." width=80%}
+
+---
+
+### 3.5 Tier-Level Analysis (Testing the Border Dilution Hypothesis)
+
+Finally, tier-level analysis directly addresses the **border dilution hypothesis** — the idea that purity should decrease with distance from the U.S.–Mexico border.  
+Across the three tiers, **no systematic purity decline** is observed over time.  
+This finding reinforces that **the border dilution effect is not evident** in DEA LIMS data from 2010–2022.
+
+![](../artifacts/purity_by_tier_over_time.png){fig-cap="Purity distribution over time by border tier (where available)." width=80%}
+
+---
+
+## 4. Discussion
+
+### 4.1 Revisiting the Border Dilution Hypothesis
+
+This analysis set out to reexamine the so-called **border dilution effect** — the idea that illicit drug purity systematically decreases with distance from the U.S.–Mexico border.  
+Across 13 years of DEA laboratory seizure data, **no consistent evidence of such a gradient was found**.  
+
+Average purity levels were comparable across **Tier 1 (border states)**, **Tier 2 (adjacent states)**, and **Tier 3 (interior states)**.  
+In fact, in several years, interior states exhibited purity levels on par with or exceeding those of border states.  
+This contradicts the long-standing narrative that purity is tightly linked to geographic proximity to the border.
+
+---
+
+### 4.2 Feature Importance and the Role of Geography
+
+The permutation importance analysis clearly indicated that **drug type is the single strongest predictor** of purity category.  
+Fentanyl, Methamphetamine, and Cocaine dominate the model’s predictive capacity.  
+
+In contrast, **geographic variables (state, tier, coordinates)** contributed only marginally to model performance.  
+This result is reinforced by the ablation study: removing geographic information did not substantially degrade performance, indicating that **purity levels are driven more by substance-specific market dynamics** than by spatial location.
+
+This is consistent with the evolving structure of drug markets:
+- **Distributed production and trafficking** networks blur traditional border effects.  
+- Synthetic drugs like fentanyl are produced and trafficked through multiple entry points and domestic networks, reducing geographic gradients.  
+- Local distribution networks are less constrained by proximity to the southern border than traditional narratives suggest.
+
+---
+
+### 4.3 Temporal Stability and Market Dynamics
+
+Model performance was **remarkably stable from 2010 to 2022** under a leave-one-year-out validation scheme.  
+This indicates that the relationship between drug type, state, and purity has **not undergone dramatic structural change over time**, even as the overall composition of the drug market shifted (e.g., the rise of fentanyl in the mid-2010s).
+
+This temporal stability suggests:
+- Market organization is relatively **resilient to enforcement or policy shocks**.  
+- Geographic factors have not gained or lost predictive power over time.  
+- Drug type continues to be the key structural determinant of purity across years.
+
+---
+
+### 4.4 Methodological and Data Limitations
+
+Despite the clear patterns, some **important limitations** must be acknowledged:
+
+- **Purity is binned in coarse 10% intervals** rather than reported as continuous values, which blunts sensitivity to small but potentially meaningful differences.  
+- Some **years and states have missing purity data**, potentially introducing biases in temporal or spatial comparisons.  
+- DEA LIMS aggregates some states (e.g., ND/NE/SD/WY) to protect privacy, reducing geographic granularity.  
+- Tier classifications are coarse and may not fully reflect the complex structure of drug trafficking routes.
+
+These limitations could **mask subtle geographic patterns**, but given the magnitude of the observed non-effects, it is unlikely that more granular data would reveal a strong border gradient.
+
+---
+
+### 4.5 Policy and Research Implications
+
+The absence of a border dilution effect has important implications for how drug markets — and border policies — are framed:
+
+- **Border-centric enforcement narratives are misaligned** with the empirical distribution of drug purity.  
+- High-purity drugs are widely distributed throughout the country, not confined to border regions.  
+- Policy strategies that emphasize border security as a proxy for controlling drug potency may be **inefficient or misplaced**.  
+- This finding aligns with recent research emphasizing **networked trafficking and domestic distribution** as key drivers of drug availability.
+
+### 4.6 Future research
+Future research could explore:
+
+- Combine DEA seizure data with **public health outcomes** (e.g., overdose mortality) to examine how purity interacts with harm.  
+- Incorporate **supply chain and trafficking network data** to model the actual pathways through which high-purity drugs move.  
+- Use **more granular geospatial and temporal models** if more detailed data become available.
+
+---
+
+## 5. Conclusion
+
+This analysis provides a clear, data-driven assessment of a long-standing assumption in U.S. drug policy discourse.  
+Between 2010 and 2022, **no empirical evidence supports a systematic border dilution effect** in DEA laboratory seizure data.  
+
+Purity is **driven primarily by drug type**, not by geographic proximity to the border.  
+This calls for a reframing of narratives and enforcement strategies that overemphasize border control as a mechanism for managing drug potency.
+
+---
+
+## 6. Reproducibility
+
+### 6.1 Setup
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 6.2 Run Analysis
+
+```bash
+# Environment setup
+python -m venv .venv
+source .venv/bin/activate         # On Windows use: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Data prep
+#    - Cleans raw DEA CSV
+#    - Converts purity bins to numeric midpoints
+#    - Saves output as data/lims_prepared.parquet
+python -m src.data_prep
+
+# Train model with Leave-One-Year-Out (LOYO) cross-validation
+#    - Produces performance metrics and plots over time
+python -m src.train_loyo --data data/lims_prepared.parquet
+
+# 5. Generate visualizations
+#    (a) Heatmap of mean purity by state
+python -m src.heatmap_purity_by_state
+
+#    (b) Tier-based purity over time
+python -m src.plot_tier_purity_over_time
+
+#    (c) Feature importance from trained model
+python -m src.permutation_importance
+```
+
+---
+
+## 7. References
+
+- DEA Laboratory Information Management System (LIMS) Public Use File.  
+- Original border dilution study (2010).  
+- Relevant policy and enforcement reports (2010–2022).
